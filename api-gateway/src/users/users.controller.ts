@@ -4,6 +4,9 @@ import { OnModuleInit } from '@nestjs/common';
 import { lastValueFrom } from 'rxjs';
 import { CreateUserDto } from './dto/create-user.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth-guard';
+
 
 
 interface UserService {
@@ -11,7 +14,7 @@ interface UserService {
   GetUserById(data: { id: string }): any;
   GetUsers(data: {}): any;
 }
-
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController implements OnModuleInit {
   private userService: UserService;
