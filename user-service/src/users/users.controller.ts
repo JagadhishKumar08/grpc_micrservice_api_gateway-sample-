@@ -40,4 +40,19 @@ async createUser(data: { name: string; email: string }) {
     const users = await this.prisma.user.findMany();
     return { users };
   }
+
+  @GrpcMethod('UserService','FindUserByEmail')
+  async findUserByEmail(data:{email:string}){
+    const user = await this.prisma.user.findUnique({where:{email:data.email},
+    });
+    if(!user){
+      return {
+        id:'',
+        name:'',
+        email:''
+      };
+    }
+
+    return user;
+  }
 }
