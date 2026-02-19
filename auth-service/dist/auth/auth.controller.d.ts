@@ -7,6 +7,7 @@ export declare class AuthController implements OnModuleInit {
     onModuleInit(): void;
     login(data: {
         email: string;
+        password: string;
     }): Promise<{
         accessToken: string;
     }>;

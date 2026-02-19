@@ -50,6 +50,8 @@ const common_1 = require("@nestjs/common");
 const microservices_1 = require("@nestjs/microservices");
 const rxjs_1 = require("rxjs");
 const jwt = __importStar(require("jsonwebtoken"));
+const bcrypt = __importStar(require("bcrypt"));
+const microservices_2 = require("@nestjs/microservices");
 const SECRET = 'supersecret';
 let AuthController = class AuthController {
     client;
@@ -62,14 +64,24 @@ let AuthController = class AuthController {
             this.client.getService('UserService');
     }
     async login(data) {
+        if (!data.email) {
+            throw new microservices_2.RpcException('Email is required');
+        }
+        if (!data.password) {
+            throw new microservices_2.RpcException('Password is required');
+        }
         const user = await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email: data.email }));
         if (!user || !user.id) {
-            throw new Error('User not found');
+            throw new microservices_2.RpcException('User not found');
         }
-        const token = jwt.sign({
-            userId: user.id,
-            email: user.email,
-        }, SECRET, { expiresIn: '1h' });
+        if (!user.password) {
+            throw new microservices_2.RpcException('User has no password set');
+        }
+        const isMatch = await bcrypt.compare(data.password, user.password);
+        if (!isMatch) {
+            throw new microservices_2.RpcException('Invalid email or password');
+        }
+        const token = jwt.sign({ userId: user.id, email: user.email }, 'supersecret', { expiresIn: '1h' });
         return { accessToken: token };
     }
     validateToken(data) {
