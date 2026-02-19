@@ -10,11 +10,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth-guard';
 
 
 interface UserService {
-  CreateUser(data: { name: string; email: string }): any;
+  CreateUser(data: { name: string; email: string; password: string }): any;
   GetUserById(data: { id: string }): any;
   GetUsers(data: {}): any;
 }
-@UseGuards(JwtAuthGuard)
+
 @Controller('users')
 export class UsersController implements OnModuleInit {
   private userService: UserService;
@@ -27,29 +27,15 @@ export class UsersController implements OnModuleInit {
   }
 
 @Post()
-async createUser(@Body() body: CreateUserDto) {
-  try {
-    return await lastValueFrom(
-      this.userService.CreateUser(body),
-    );
-  } catch (error: any) {
-  console.log('GATEWAY ERROR:', error);
-
-  if (error.details === 'Email already exists') {
-    throw new HttpException(
-      'Email already exists',
-      HttpStatus.CONFLICT,
-    );
-  }
-
-  throw new HttpException(
-    'Internal server error',
-    HttpStatus.INTERNAL_SERVER_ERROR,
+async createUser(@Body() body: any) {
+  return lastValueFrom(
+    this.userService.CreateUser(body),
   );
 }
-}
+
 
 @Get()
+@UseGuards(JwtAuthGuard)
 async getUsers() {
   return await lastValueFrom(
     this.userService.GetUsers({}),
@@ -57,6 +43,7 @@ async getUsers() {
 }
 
 @Get(':id')
+@UseGuards(JwtAuthGuard)
 async getUser(@Param('id') id: string) {
   return await lastValueFrom(
     this.userService.GetUserById({ id }),

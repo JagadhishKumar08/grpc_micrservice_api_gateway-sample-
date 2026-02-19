@@ -41,15 +41,47 @@ var __importStar = (this && this.__importStar) || (function () {
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
 const microservices_1 = require("@nestjs/microservices");
+const rxjs_1 = require("rxjs");
 const jwt = __importStar(require("jsonwebtoken"));
+const bcrypt = __importStar(require("bcrypt"));
+const microservices_2 = require("@nestjs/microservices");
 const SECRET = 'supersecret';
 let AuthController = class AuthController {
-    login(data) {
-        const token = jwt.sign({ userId: data.email }, SECRET, { expiresIn: '1h' });
+    client;
+    userService;
+    constructor(client) {
+        this.client = client;
+    }
+    onModuleInit() {
+        this.userService =
+            this.client.getService('UserService');
+    }
+    async login(data) {
+        if (!data.email) {
+            throw new microservices_2.RpcException('Email is required');
+        }
+        if (!data.password) {
+            throw new microservices_2.RpcException('Password is required');
+        }
+        const user = await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email: data.email }));
+        if (!user || !user.id) {
+            throw new microservices_2.RpcException('User not found');
+        }
+        if (!user.password) {
+            throw new microservices_2.RpcException('User has no password set');
+        }
+        const isMatch = await bcrypt.compare(data.password, user.password);
+        if (!isMatch) {
+            throw new microservices_2.RpcException('Invalid email or password');
+        }
+        const token = jwt.sign({ userId: user.id, email: user.email }, 'supersecret', { expiresIn: '1h' });
         return { accessToken: token };
     }
     validateToken(data) {
@@ -73,7 +105,7 @@ __decorate([
     (0, microservices_1.GrpcMethod)('AuthService', 'Login'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
     (0, microservices_1.GrpcMethod)('AuthService', 'ValidateToken'),
@@ -82,6 +114,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "validateToken", null);
 exports.AuthController = AuthController = __decorate([
-    (0, common_1.Controller)()
+    (0, common_1.Controller)(),
+    __param(0, (0, common_1.Inject)('USER_SERVICE')),
+    __metadata("design:paramtypes", [Object])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map

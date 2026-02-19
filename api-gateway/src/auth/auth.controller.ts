@@ -18,7 +18,7 @@ export class AuthController implements OnModuleInit {
   }
 
   @Post('login')
-  async login(@Body() body: { email: string }) {
+  async login(@Body() body: { email: string, password: string }) {
     return await lastValueFrom(
       this.authService.Login(body),
     );
