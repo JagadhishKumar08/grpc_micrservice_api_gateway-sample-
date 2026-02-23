@@ -10,13 +10,14 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const auth_controller_1 = require("./auth/auth.controller");
 const microservices_1 = require("@nestjs/microservices");
+const redis_module_1 = require("./redis/redis.module");
 const path_1 = require("path");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [microservices_1.ClientsModule.register([
+        imports: [redis_module_1.RedisModule, microservices_1.ClientsModule.register([
                 {
                     name: 'USER_SERVICE',
                     transport: microservices_1.Transport.GRPC,

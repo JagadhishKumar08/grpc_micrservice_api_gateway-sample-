@@ -52,12 +52,15 @@ const rxjs_1 = require("rxjs");
 const jwt = __importStar(require("jsonwebtoken"));
 const bcrypt = __importStar(require("bcrypt"));
 const microservices_2 = require("@nestjs/microservices");
+const redis_service_1 = require("../redis/redis.service");
 const SECRET = 'supersecret';
 let AuthController = class AuthController {
     client;
+    redisService;
     userService;
-    constructor(client) {
+    constructor(client, redisService) {
         this.client = client;
+        this.redisService = redisService;
     }
     onModuleInit() {
         this.userService =
@@ -70,9 +73,20 @@ let AuthController = class AuthController {
         if (!data.password) {
             throw new microservices_2.RpcException('Password is required');
         }
-        const user = await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email: data.email }));
-        if (!user || !user.id) {
-            throw new microservices_2.RpcException('User not found');
+        const cacheKey = `user:${data.email}`;
+        let user;
+        const cachedUser = await this.redisService.get(cacheKey);
+        if (cachedUser) {
+            console.log('⚡ User fetched from Redis');
+            user = JSON.parse(cachedUser);
+        }
+        else {
+            user = await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email: data.email }));
+            console.log('🐘 User fetched from User Service (DB)');
+            if (!user || !user.id) {
+                throw new microservices_2.RpcException('User not found');
+            }
+            await this.redisService.set(cacheKey, JSON.stringify(user), 60);
         }
         if (!user.password) {
             throw new microservices_2.RpcException('User has no password set');
@@ -81,7 +95,7 @@ let AuthController = class AuthController {
         if (!isMatch) {
             throw new microservices_2.RpcException('Invalid email or password');
         }
-        const token = jwt.sign({ userId: user.id, email: user.email }, 'supersecret', { expiresIn: '1h' });
+        const token = jwt.sign({ userId: user.id, email: user.email }, SECRET, { expiresIn: '1h' });
         return { accessToken: token };
     }
     validateToken(data) {
@@ -116,6 +130,6 @@ __decorate([
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)(),
     __param(0, (0, common_1.Inject)('USER_SERVICE')),
-    __metadata("design:paramtypes", [Object])
+    __metadata("design:paramtypes", [Object, redis_service_1.RedisService])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map
