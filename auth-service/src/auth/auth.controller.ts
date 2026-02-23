@@ -5,6 +5,7 @@ import { lastValueFrom, Observable } from 'rxjs';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import { RpcException } from '@nestjs/microservices';
+import { RedisService } from '../redis/redis.service';
 
 
 const SECRET = 'supersecret';
@@ -26,13 +27,14 @@ export class AuthController implements OnModuleInit {
 
   constructor(
     @Inject('USER_SERVICE') private client: ClientGrpc,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleInit() {
     this.userService =
       this.client.getService<UserService>('UserService');
   }
-  @GrpcMethod('AuthService', 'Login')
+@GrpcMethod('AuthService', 'Login')
 async login(data: { email: string; password: string }) {
   if (!data.email) {
     throw new RpcException('Email is required');
@@ -42,12 +44,33 @@ async login(data: { email: string; password: string }) {
     throw new RpcException('Password is required');
   }
 
-  const user = await lastValueFrom(
-    this.userService.FindUserByEmail({ email: data.email }),
-  );
+  const cacheKey = `user:${data.email}`;
+  let user: UserResponse;
 
-  if (!user || !user.id) {
-    throw new RpcException('User not found');
+  // 🔎 Try fetching from Redis first
+  const cachedUser = await this.redisService.get(cacheKey);
+
+  if (cachedUser) {
+    console.log('⚡ User fetched from Redis');
+    user = JSON.parse(cachedUser);
+  } else {
+    
+
+    user = await lastValueFrom(
+      this.userService.FindUserByEmail({ email: data.email }),
+    );
+    console.log('🐘 User fetched from User Service (DB)');
+
+    if (!user || !user.id) {
+      throw new RpcException('User not found');
+    }
+
+    // Cache user for 60 seconds
+    await this.redisService.set(
+      cacheKey,
+      JSON.stringify(user),
+      60, // TTL in seconds
+    );
   }
 
   if (!user.password) {
@@ -65,13 +88,12 @@ async login(data: { email: string; password: string }) {
 
   const token = jwt.sign(
     { userId: user.id, email: user.email },
-    'supersecret',
+    SECRET,
     { expiresIn: '1h' },
   );
 
   return { accessToken: token };
 }
-
 
 
   @GrpcMethod('AuthService', 'ValidateToken')
