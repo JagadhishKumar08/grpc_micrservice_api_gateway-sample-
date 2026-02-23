@@ -19,6 +19,7 @@ export class AuthController implements OnModuleInit {
 
   @Post('login')
   async login(@Body() body: { email: string, password: string }) {
+    console.log("PID:", process.pid);
     return await lastValueFrom(
       this.authService.Login(body),
     );

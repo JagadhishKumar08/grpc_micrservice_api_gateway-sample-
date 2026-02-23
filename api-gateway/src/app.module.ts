@@ -22,7 +22,7 @@ import { AuthController } from './auth/auth.controller';
         options: {
           package: 'auth',
           protoPath: join(process.cwd(), 'proto/auth.proto'),
-          url: 'localhost:50052',
+          url: 'localhost:9000',
         },
       },
     ]),
