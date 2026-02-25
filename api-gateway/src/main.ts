@@ -5,6 +5,7 @@ import { GrpcExceptionFilter } from './common/filters/grpc-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const port = process.env.PORT || 3000;
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -14,6 +15,7 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new GrpcExceptionFilter()); 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
+  console.log(`Gateway running on port ${port}`);
 }
 bootstrap();

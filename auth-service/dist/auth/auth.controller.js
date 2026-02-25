@@ -53,10 +53,12 @@ const jwt = __importStar(require("jsonwebtoken"));
 const bcrypt = __importStar(require("bcrypt"));
 const microservices_2 = require("@nestjs/microservices");
 const redis_service_1 = require("../redis/redis.service");
+const CircuitBreaker = require('opossum');
 const SECRET = 'supersecret';
 let AuthController = class AuthController {
     client;
     redisService;
+    userBreaker;
     userService;
     constructor(client, redisService) {
         this.client = client;
@@ -65,6 +67,17 @@ let AuthController = class AuthController {
     onModuleInit() {
         this.userService =
             this.client.getService('UserService');
+        const options = {
+            timeout: 3000,
+            errorThresholdPercentage: 50,
+            resetTimeout: 10000,
+        };
+        this.userBreaker = new CircuitBreaker(async (email) => {
+            return await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email }));
+        }, options);
+        this.userBreaker.on('open', () => console.log('🚨 User Service circuit breaker opened'));
+        this.userBreaker.on('halfOpen', () => console.log('🔄 User Service circuit breaker half-open'));
+        this.userBreaker.on('close', () => console.log('✅ User Service circuit breaker closed'));
     }
     async login(data) {
         if (!data.email) {
@@ -81,8 +94,14 @@ let AuthController = class AuthController {
             user = JSON.parse(cachedUser);
         }
         else {
-            user = await (0, rxjs_1.lastValueFrom)(this.userService.FindUserByEmail({ email: data.email }));
-            console.log('🐘 User fetched from User Service (DB)');
+            console.log('🐘 Fetching user via Circuit Breaker');
+            try {
+                user = await this.userBreaker.fire(data.email);
+            }
+            catch (error) {
+                console.error('❌ User service unavailable');
+                throw new microservices_2.RpcException('User service temporarily unavailable');
+            }
             if (!user || !user.id) {
                 throw new microservices_2.RpcException('User not found');
             }
